@@ -5,6 +5,7 @@ import com.campusgigs.api.dto.UsuarioResponse;
 import com.campusgigs.api.entity.Usuario;
 import com.campusgigs.api.entity.enums.Papel;
 import com.campusgigs.api.exception.EmailJaCadastradoException;
+import com.campusgigs.api.exception.RecursoNaoEncontradoException;
 import com.campusgigs.api.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,5 +33,12 @@ public class UsuarioService {
                 .build();
 
         return UsuarioResponse.de(usuarioRepository.save(usuario));
+    }
+
+    public UsuarioResponse buscarPorEmail(String email) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuario nao encontrado"));
+
+        return UsuarioResponse.de(usuario);
     }
 }

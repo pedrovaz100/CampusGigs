@@ -36,7 +36,16 @@ O projeto e desenvolvido em checkpoints incrementais.
 - Tratamento centralizado de erros (`GlobalExceptionHandler`) e respostas JSON tambem para falhas do filtro de seguranca (401/403).
 - Senhas nunca aparecem nas respostas da API.
 
-Emissao/validacao de JWT e regras de autorizacao por papel **ainda nao foram implementadas** — serao adicionadas nos proximos checkpoints.
+**CP3 — Emissao e validacao de JWT:**
+
+- `POST /auth/login` agora retorna um token JWT (`token`, `tipo: "Bearer"`) junto aos dados do usuario autenticado.
+- `GET /usuarios/me`: endpoint protegido que retorna os dados do usuario autenticado a partir do token (identidade extraida do proprio token, nunca de um ID enviado pelo cliente).
+- `JwtAuthenticationFilter` valida assinatura e expiracao do token em cada requisicao e popula o contexto de seguranca do Spring; API 100% stateless (`SessionCreationPolicy.STATELESS`), sem depender de sessao HTTP.
+- Chave de assinatura e tempo de expiracao configurados externamente via `JWT_SECRET` e `JWT_EXPIRATION_MS` (sem segredo real versionado; o valor em `.env.example` e apenas um placeholder de desenvolvimento).
+- Respostas 401 diferenciadas para token ausente, invalido e expirado, sempre em JSON (inclusive erros vindos do filtro de seguranca, antes de chegar ao controller).
+- Cadastro e login continuam publicos; qualquer outro endpoint exige o header `Authorization: Bearer <token>`.
+
+Regras de autorizacao por papel (ownership, ADMIN, etc.) e o fluxo de servicos/contratacoes **ainda nao foram implementados** — serao adicionados no proximo checkpoint.
 
 ## Pre-requisitos
 
@@ -80,6 +89,8 @@ Emissao/validacao de JWT e regras de autorizacao por papel **ainda nao foram imp
 | `DB_PASSWORD` | Senha do banco                          | `campusgigs` |
 | `DB_PORT`     | Porta exposta do PostgreSQL no host     | `5432`       |
 | `SERVER_PORT` | Porta exposta da API no host            | `8080`       |
+| `JWT_SECRET`  | Chave de assinatura dos tokens JWT (use um valor proprio e secreto fora do ambiente local) | placeholder de dev |
+| `JWT_EXPIRATION_MS` | Tempo de validade do token, em milissegundos | `3600000` (1h) |
 
 ## Estrutura do schema (V1)
 
@@ -118,4 +129,13 @@ Content-Type: application/json
 }
 ```
 
-Retorna `200` com os dados do usuario autenticado quando as credenciais sao validas, ou `401` com mensagem generica quando invalidas (sem indicar se o problema foi o e-mail ou a senha). Esta etapa ainda nao emite token JWT.
+Retorna `200` com um token JWT e os dados do usuario autenticado quando as credenciais sao validas, ou `401` com mensagem generica quando invalidas (sem indicar se o problema foi o e-mail ou a senha).
+
+### Endpoint protegido (identidade autenticada)
+
+```
+GET /usuarios/me
+Authorization: Bearer <token>
+```
+
+Retorna `200` com os dados do usuario dono do token. Retorna `401` se o header `Authorization` estiver ausente, malformado, com token invalido ou expirado.

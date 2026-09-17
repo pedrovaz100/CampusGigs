@@ -23,9 +23,12 @@ public class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
                           AuthenticationException authException) throws IOException, ServletException {
+        Object erroJwt = request.getAttribute(JwtAuthenticationFilter.ATRIBUTO_ERRO_JWT);
+        String mensagem = erroJwt != null ? erroJwt.toString() : "Autenticacao necessaria";
+
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        ErroResponse erro = ErroResponse.de(HttpStatus.UNAUTHORIZED.value(), "Autenticacao necessaria");
+        ErroResponse erro = ErroResponse.de(HttpStatus.UNAUTHORIZED.value(), mensagem);
         objectMapper.writeValue(response.getWriter(), erro);
     }
 }

@@ -6,6 +6,7 @@ import com.campusgigs.api.dto.UsuarioResponse;
 import com.campusgigs.api.entity.Usuario;
 import com.campusgigs.api.exception.CredenciaisInvalidasException;
 import com.campusgigs.api.repository.UsuarioRepository;
+import com.campusgigs.api.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -18,6 +19,7 @@ public class AutenticacaoService {
 
     private final AuthenticationManager authenticationManager;
     private final UsuarioRepository usuarioRepository;
+    private final JwtService jwtService;
 
     public LoginResponse autenticar(LoginRequest request) {
         try {
@@ -30,6 +32,7 @@ public class AutenticacaoService {
         Usuario usuario = usuarioRepository.findByEmail(request.email())
                 .orElseThrow(CredenciaisInvalidasException::new);
 
-        return new LoginResponse("Autenticacao realizada com sucesso", UsuarioResponse.de(usuario));
+        String token = jwtService.gerarToken(usuario);
+        return new LoginResponse(token, "Bearer", UsuarioResponse.de(usuario));
     }
 }
