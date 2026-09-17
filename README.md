@@ -2,6 +2,12 @@
 
 Plataforma de servicos freelance entre estudantes universitarios. API REST construida com Java 17 e Spring Boot.
 
+
+##  Autor
+
+- Pedro Vaz - RM 566551
+- João Victor luiz oliveira resende - RM 565139
+
 ## Tecnologias
 
 - Java 17
