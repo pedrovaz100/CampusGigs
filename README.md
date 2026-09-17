@@ -15,7 +15,9 @@ Plataforma de servicos freelance entre estudantes universitarios. API REST const
 
 ## Status do desenvolvimento
 
-O projeto e desenvolvido em checkpoints incrementais. Esta versao corresponde ao **CP1 — Docker e schema inicial**:
+O projeto e desenvolvido em checkpoints incrementais.
+
+**CP1 — Docker e schema inicial:**
 
 - Estrutura Maven do projeto.
 - Dockerfile (multi-stage) e Docker Compose (aplicacao + PostgreSQL).
@@ -24,7 +26,17 @@ O projeto e desenvolvido em checkpoints incrementais. Esta versao corresponde ao
 - Migration inicial (Flyway) com as tabelas `usuarios`, `servicos` e `contratacoes`.
 - Entidades JPA mapeadas para o schema (`ddl-auto=validate`, Flyway e o responsavel pelo schema).
 
-Cadastro, login, emissao de JWT e regras de autorizacao **ainda nao foram implementados** — serao adicionados nos proximos checkpoints.
+**CP2 — Cadastro e autenticacao com senha protegida:**
+
+- `POST /usuarios/cadastro`: cria usuario com papel `USER` (fixo pelo backend) e senha com hash BCrypt.
+- `POST /auth/login`: valida e-mail e senha via `AuthenticationManager`/`DaoAuthenticationProvider` do Spring Security. Resposta de sucesso traz os dados do usuario autenticado, **sem emissao de token** (isso sera adicionado no CP3).
+- Credenciais invalidas (senha errada ou e-mail inexistente) retornam a mesma mensagem generica em 401, sem revelar qual dado estava incorreto.
+- E-mail duplicado no cadastro retorna 409.
+- Validacao de campos obrigatorios com Bean Validation (400 com detalhamento por campo).
+- Tratamento centralizado de erros (`GlobalExceptionHandler`) e respostas JSON tambem para falhas do filtro de seguranca (401/403).
+- Senhas nunca aparecem nas respostas da API.
+
+Emissao/validacao de JWT e regras de autorizacao por papel **ainda nao foram implementadas** — serao adicionadas nos proximos checkpoints.
 
 ## Pre-requisitos
 
@@ -76,3 +88,34 @@ Cadastro, login, emissao de JWT e regras de autorizacao **ainda nao foram implem
 - `contratacoes`: vinculada a um servico e a um contratante (`usuarios`), situacao (`SOLICITADA`/`ACEITA`/`CONCLUIDA`/`CANCELADA`).
 
 Novas evolucoes de schema devem ser feitas por meio de novas migrations (`V2__...sql`, etc.), nunca alterando migrations ja aplicadas.
+
+## Endpoints disponiveis (CP2)
+
+### Cadastrar usuario
+
+```
+POST /usuarios/cadastro
+Content-Type: application/json
+
+{
+  "nome": "Ana Silva",
+  "email": "ana@campus.edu",
+  "senha": "senha123"
+}
+```
+
+Retorna `201` com os dados do usuario criado (papel `USER`, sem a senha). Retorna `409` se o e-mail ja estiver cadastrado e `400` se algum campo for invalido.
+
+### Login
+
+```
+POST /auth/login
+Content-Type: application/json
+
+{
+  "email": "ana@campus.edu",
+  "senha": "senha123"
+}
+```
+
+Retorna `200` com os dados do usuario autenticado quando as credenciais sao validas, ou `401` com mensagem generica quando invalidas (sem indicar se o problema foi o e-mail ou a senha). Esta etapa ainda nao emite token JWT.
