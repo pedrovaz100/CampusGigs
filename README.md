@@ -56,6 +56,15 @@ O projeto e desenvolvido em checkpoints incrementais.
 - Campos como `prestadorId`, `contratanteId` ou `papel` enviados no corpo da requisicao sao ignorados pelos DTOs de entrada — identidade e papel vem sempre do token.
 - Usuario ADMIN de teste disponibilizado apenas em ambiente de desenvolvimento (veja a secao "ADMIN para testes locais" abaixo).
 
+**CP5 — Integracao de CEP e revisao final:**
+
+- Cliente HTTP declarativo do Spring (`@GetExchange`) consultando o ViaCEP (`ViaCepClient`), usado no cadastro de usuario (CEP opcional) e na atualizacao do proprio CEP.
+- `PUT /usuarios/me/cep`: atualiza CEP/cidade/UF do usuario autenticado (nunca de outro usuario, pois o alvo e sempre extraido do token).
+- CEP validado e normalizado (aceita com ou sem hifen) antes da consulta externa; formato invalido retorna `400` sem sequer chamar o ViaCEP.
+- CEP inexistente (ViaCEP responde `{"erro": true}`) retorna `400` com mensagem especifica.
+- Indisponibilidade, timeout ou resposta invalida do ViaCEP retornam `503`, sem nunca deixar o cadastro/atualizacao parcialmente concluido — a consulta acontece antes de qualquer `save()`, dentro do mesmo metodo transacional.
+- Timeout de conexao/leitura configuravel via `VIACEP_TIMEOUT_MS` (padrao 3s).
+
 ## Decisoes de escopo (contratacao)
 
 O enunciado define as situacoes `SOLICITADA`, `ACEITA`, `CONCLUIDA` e `CANCELADA` para contratacoes, mas as funcionalidades obrigatorias listadas cobrem apenas a criacao da contratacao. Por isso, o CP4 implementa unicamente a criacao (sempre iniciando em `SOLICITADA`); endpoints para transicionar a contratacao entre os demais estados nao foram implementados por nao fazerem parte do escopo funcional exigido, evitando inventar um fluxo nao especificado.
@@ -107,6 +116,8 @@ O enunciado define as situacoes `SOLICITADA`, `ACEITA`, `CONCLUIDA` e `CANCELADA
 | `SPRING_PROFILES_ACTIVE` | Profile ativo do Spring. Defina como `dev` para habilitar o seed do usuario ADMIN de teste | vazio |
 | `ADMIN_EMAIL` | E-mail do usuario ADMIN de teste (so tem efeito com `SPRING_PROFILES_ACTIVE=dev`) | vazio |
 | `ADMIN_PASSWORD` | Senha do usuario ADMIN de teste (so tem efeito com `SPRING_PROFILES_ACTIVE=dev`) | vazio |
+| `VIACEP_BASE_URL` | URL base do servico de consulta de CEP | `https://viacep.com.br/ws` |
+| `VIACEP_TIMEOUT_MS` | Timeout de conexao/leitura para a consulta de CEP, em milissegundos | `3000` |
 
 ## ADMIN para testes locais
 
@@ -128,7 +139,7 @@ Com essas variaveis definidas, o `AdminSeeder` (componente restrito ao profile `
 
 Novas evolucoes de schema devem ser feitas por meio de novas migrations (`V2__...sql`, etc.), nunca alterando migrations ja aplicadas.
 
-## Endpoints disponiveis (CP2)
+## Endpoints disponiveis
 
 ### Cadastrar usuario
 
@@ -225,3 +236,54 @@ Content-Type: application/json
 ```
 
 Retorna `201`. Retorna `409` se o servico nao estiver `ATIVO` ou se o usuario autenticado for o proprio prestador do servico.
+
+### Listar minhas contratacoes
+
+```
+GET /contratacoes/minhas
+Authorization: Bearer <token>
+```
+
+Retorna `200` com as contratacoes feitas pelo usuario autenticado.
+
+### Atualizar CEP do usuario autenticado
+
+```
+PUT /usuarios/me/cep
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "cep": "01001-000"
+}
+```
+
+Retorna `200` com o usuario atualizado (CEP normalizado, cidade e UF preenchidos pelo ViaCEP). Retorna `400` para CEP invalido/inexistente e `503` se o servico de CEP estiver indisponivel ou nao responder a tempo.
+
+## Roteiro de testes manuais
+
+Exemplos prontos (sem segredos reais) estao no arquivo [requests.http](requests.http) — abra com a extensao REST Client (VS Code) ou equivalente, execute o cadastro/login e copie o `token` retornado para as demais chamadas.
+
+Roteiro sugerido, com a aplicacao rodando via `docker compose up`:
+
+1. Cadastre dois usuarios `USER` (ex.: Bruno e Carla) via `POST /usuarios/cadastro`. Repita o cadastro de um deles para confirmar `409`.
+2. Faca login com ambos e guarde os tokens. Tente logar com senha errada e confirme `401` com mensagem generica.
+3. Chame `GET /usuarios/me` com e sem token, confirmando `200` e `401` respectivamente.
+4. Com o token do Bruno, publique um servico (`POST /servicos`) e liste os servicos (`GET /servicos`).
+5. Com o token da Carla, contrate o servico do Bruno (`POST /contratacoes`) — espera `201`.
+6. Com o token do Bruno, tente contratar o proprio servico — espera `409`.
+7. Com o token da Carla, tente editar o servico do Bruno (`PUT /servicos/{id}`) — espera `403`.
+8. Com o token do Bruno, edite o proprio servico — espera `200`.
+9. **Acesso negado por papel:** com o token da Carla (papel `USER`), tente encerrar o servico do Bruno (`POST /servicos/{id}/encerrar`) — espera `403`.
+10. Habilite o ADMIN de teste (secao acima), faca login com ele e repita o encerramento do mesmo servico — espera `200`, confirmando que o `ADMIN` tem essa permissao especifica.
+11. Com a Carla, tente contratar o servico agora `ENCERRADO` — espera `409`.
+12. Cadastre um novo usuario informando um CEP valido (ex.: `01001-000`) e confirme que `cidade`/`uf` vieram preenchidos na resposta. Repita com um CEP inexistente (ex.: `99999-999`) e confirme `400` — e que o usuario **nao** foi criado (tentativa de login com essas credenciais deve retornar `401`).
+13. Com um token valido, atualize o proprio CEP via `PUT /usuarios/me/cep`.
+
+## Integracao de CEP: comportamento e falhas
+
+- A consulta usa um cliente HTTP declarativo do Spring (`@HttpExchange`/`@GetExchange`), sem chamadas HTTP manuais.
+- O CEP informado e normalizado (removendo caracteres nao numericos) e validado (deve resultar em exatamente 8 digitos) **antes** de qualquer chamada externa; formato invalido nunca chega a consultar o ViaCEP.
+- Se o ViaCEP responder que o CEP nao existe, a API retorna `400` com mensagem clara, e nada e persistido.
+- Se o ViaCEP nao responder dentro do timeout configurado (`VIACEP_TIMEOUT_MS`), estiver fora do ar, ou responder algo que nao seja um endereco valido, a API retorna `503` — o cadastro ou a atualizacao de CEP **inteiros** falham, sem deixar o usuario com CEP preenchido e cidade/UF vazios (a consulta acontece antes do `save()`, dentro do mesmo metodo `@Transactional`).
+- Esse comportamento foi validado manualmente apontando `VIACEP_BASE_URL` para um endereco inalcancavel e confirmando o `503` dentro do tempo de timeout configurado, e o CEP nunca ficando salvo parcialmente.

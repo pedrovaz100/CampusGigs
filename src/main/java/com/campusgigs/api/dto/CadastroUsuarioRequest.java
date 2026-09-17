@@ -17,6 +17,8 @@ public record CadastroUsuarioRequest(
 
         @NotBlank(message = "Senha e obrigatoria")
         @Size(min = 6, max = 100, message = "Senha deve ter entre 6 e 100 caracteres")
-        String senha
+        String senha,
+
+        String cep
 ) {
 }

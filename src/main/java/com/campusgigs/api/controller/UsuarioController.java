@@ -1,5 +1,6 @@
 package com.campusgigs.api.controller;
 
+import com.campusgigs.api.dto.AtualizarCepRequest;
 import com.campusgigs.api.dto.CadastroUsuarioRequest;
 import com.campusgigs.api.dto.UsuarioResponse;
 import com.campusgigs.api.service.UsuarioService;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,5 +32,11 @@ public class UsuarioController {
     @GetMapping("/me")
     public ResponseEntity<UsuarioResponse> me(Authentication authentication) {
         return ResponseEntity.ok(usuarioService.buscarPorEmail(authentication.getName()));
+    }
+
+    @PutMapping("/me/cep")
+    public ResponseEntity<UsuarioResponse> atualizarCep(@Valid @RequestBody AtualizarCepRequest request,
+                                                          Authentication authentication) {
+        return ResponseEntity.ok(usuarioService.atualizarCep(authentication.getName(), request.cep()));
     }
 }

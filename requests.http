@@ -1,0 +1,166 @@
+@baseUrl = http://localhost:8080
+
+### Cadastrar usuario (prestador) - com CEP valido
+POST {{baseUrl}}/usuarios/cadastro
+Content-Type: application/json
+
+{
+  "nome": "Bruno Prestador",
+  "email": "bruno@campus.edu",
+  "senha": "senha123",
+  "cep": "01001-000"
+}
+
+### Cadastrar usuario (contratante) - sem CEP
+POST {{baseUrl}}/usuarios/cadastro
+Content-Type: application/json
+
+{
+  "nome": "Carla Contratante",
+  "email": "carla@campus.edu",
+  "senha": "senha123"
+}
+
+### Cadastrar usuario com e-mail duplicado (espera 409)
+POST {{baseUrl}}/usuarios/cadastro
+Content-Type: application/json
+
+{
+  "nome": "Bruno Duplicado",
+  "email": "bruno@campus.edu",
+  "senha": "outrasenha"
+}
+
+### Cadastrar usuario com dados invalidos (espera 400)
+POST {{baseUrl}}/usuarios/cadastro
+Content-Type: application/json
+
+{
+  "nome": "",
+  "email": "invalido",
+  "senha": "12"
+}
+
+### Login (prestador) - guarde o "token" da resposta para as chamadas abaixo
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "bruno@campus.edu",
+  "senha": "senha123"
+}
+
+### Login (contratante)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "carla@campus.edu",
+  "senha": "senha123"
+}
+
+### Login com senha incorreta (espera 401 generico)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "bruno@campus.edu",
+  "senha": "senhaerrada"
+}
+
+### Identidade autenticada (substitua <TOKEN_BRUNO>)
+GET {{baseUrl}}/usuarios/me
+Authorization: Bearer <TOKEN_BRUNO>
+
+### Acesso sem token (espera 401)
+GET {{baseUrl}}/usuarios/me
+
+### Atualizar CEP do proprio usuario (substitua <TOKEN_CARLA>)
+PUT {{baseUrl}}/usuarios/me/cep
+Authorization: Bearer <TOKEN_CARLA>
+Content-Type: application/json
+
+{
+  "cep": "70040-010"
+}
+
+### Atualizar com CEP inexistente (espera 400)
+PUT {{baseUrl}}/usuarios/me/cep
+Authorization: Bearer <TOKEN_CARLA>
+Content-Type: application/json
+
+{
+  "cep": "99999-999"
+}
+
+### Publicar servico (substitua <TOKEN_BRUNO>)
+POST {{baseUrl}}/servicos
+Authorization: Bearer <TOKEN_BRUNO>
+Content-Type: application/json
+
+{
+  "titulo": "Aula de Calculo",
+  "descricao": "Reforco de calculo 1",
+  "categoria": "Aulas",
+  "preco": 50.00
+}
+
+### Listar servicos (substitua <TOKEN_BRUNO> ou <TOKEN_CARLA>)
+GET {{baseUrl}}/servicos
+Authorization: Bearer <TOKEN_BRUNO>
+
+### Editar servico proprio (substitua <TOKEN_BRUNO> e o id do servico)
+PUT {{baseUrl}}/servicos/1
+Authorization: Bearer <TOKEN_BRUNO>
+Content-Type: application/json
+
+{
+  "titulo": "Aula de Calculo Avancada",
+  "descricao": "Reforco de calculo 1 e 2",
+  "categoria": "Aulas",
+  "preco": 60.00,
+  "situacao": "ATIVO"
+}
+
+### Tentar editar servico de outro usuario (substitua <TOKEN_CARLA>, espera 403)
+PUT {{baseUrl}}/servicos/1
+Authorization: Bearer <TOKEN_CARLA>
+Content-Type: application/json
+
+{
+  "titulo": "Hack",
+  "descricao": "desc",
+  "categoria": "cat",
+  "preco": 1.00,
+  "situacao": "ATIVO"
+}
+
+### Contratar servico (substitua <TOKEN_CARLA>)
+POST {{baseUrl}}/contratacoes
+Authorization: Bearer <TOKEN_CARLA>
+Content-Type: application/json
+
+{
+  "servicoId": 1
+}
+
+### Tentar contratar o proprio servico (substitua <TOKEN_BRUNO>, espera 409)
+POST {{baseUrl}}/contratacoes
+Authorization: Bearer <TOKEN_BRUNO>
+Content-Type: application/json
+
+{
+  "servicoId": 1
+}
+
+### Listar minhas contratacoes (substitua <TOKEN_CARLA>)
+GET {{baseUrl}}/contratacoes/minhas
+Authorization: Bearer <TOKEN_CARLA>
+
+### Tentar encerrar servico de outro usuario (substitua <TOKEN_CARLA>, espera 403)
+POST {{baseUrl}}/servicos/1/encerrar
+Authorization: Bearer <TOKEN_CARLA>
+
+### ADMIN encerra servico de outro usuario (login previo necessario, ver README - "ADMIN para testes locais")
+POST {{baseUrl}}/servicos/1/encerrar
+Authorization: Bearer <TOKEN_ADMIN>

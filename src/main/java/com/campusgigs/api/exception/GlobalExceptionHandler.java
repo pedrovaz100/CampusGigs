@@ -59,6 +59,20 @@ public class GlobalExceptionHandler {
                 .body(ErroResponse.de(HttpStatus.CONFLICT.value(), ex.getMessage()));
     }
 
+    @ExceptionHandler(CepInvalidoException.class)
+    public ResponseEntity<ErroResponse> tratarCepInvalido(CepInvalidoException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErroResponse.de(HttpStatus.BAD_REQUEST.value(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(CepIndisponivelException.class)
+    public ResponseEntity<ErroResponse> tratarCepIndisponivel(CepIndisponivelException ex) {
+        log.warn("Servico de CEP indisponivel: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ErroResponse.de(HttpStatus.SERVICE_UNAVAILABLE.value(),
+                        "Servico de consulta de CEP indisponivel no momento. Tente novamente mais tarde."));
+    }
+
     @ExceptionHandler(CredenciaisInvalidasException.class)
     public ResponseEntity<ErroResponse> tratarCredenciaisInvalidas(CredenciaisInvalidasException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

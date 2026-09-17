@@ -30,6 +30,9 @@ app:
   admin:
     email: ${ADMIN_EMAIL:}
     senha: ${ADMIN_PASSWORD:}
+  viacep:
+    base-url: ${VIACEP_BASE_URL:https://viacep.com.br/ws}
+    timeout-ms: ${VIACEP_TIMEOUT_MS:3000}
 
 logging:
   level:
