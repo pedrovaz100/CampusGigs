@@ -45,7 +45,20 @@ O projeto e desenvolvido em checkpoints incrementais.
 - Respostas 401 diferenciadas para token ausente, invalido e expirado, sempre em JSON (inclusive erros vindos do filtro de seguranca, antes de chegar ao controller).
 - Cadastro e login continuam publicos; qualquer outro endpoint exige o header `Authorization: Bearer <token>`.
 
-Regras de autorizacao por papel (ownership, ADMIN, etc.) e o fluxo de servicos/contratacoes **ainda nao foram implementados** — serao adicionados no proximo checkpoint.
+**CP4 — Autorizacao por papel e regras de negocio:**
+
+- `POST /servicos`: publica servico com o prestador obtido do token (nunca de um ID enviado pelo cliente).
+- `GET /servicos` e `GET /servicos/{id}`: listagem e detalhe (autenticado).
+- `PUT /servicos/{id}`: edicao restrita ao prestador dono do servico (403 para qualquer outro usuario, inclusive ADMIN).
+- `POST /servicos/{id}/encerrar`: encerramento permitido ao prestador dono **ou** a um ADMIN.
+- `POST /contratacoes`: contratacao de um servico com o contratante obtido do token; proibida para servico proprio e para servico que nao esteja `ATIVO` (409 em ambos os casos).
+- `GET /contratacoes/minhas`: lista as contratacoes feitas pelo usuario autenticado.
+- Campos como `prestadorId`, `contratanteId` ou `papel` enviados no corpo da requisicao sao ignorados pelos DTOs de entrada — identidade e papel vem sempre do token.
+- Usuario ADMIN de teste disponibilizado apenas em ambiente de desenvolvimento (veja a secao "ADMIN para testes locais" abaixo).
+
+## Decisoes de escopo (contratacao)
+
+O enunciado define as situacoes `SOLICITADA`, `ACEITA`, `CONCLUIDA` e `CANCELADA` para contratacoes, mas as funcionalidades obrigatorias listadas cobrem apenas a criacao da contratacao. Por isso, o CP4 implementa unicamente a criacao (sempre iniciando em `SOLICITADA`); endpoints para transicionar a contratacao entre os demais estados nao foram implementados por nao fazerem parte do escopo funcional exigido, evitando inventar um fluxo nao especificado.
 
 ## Pre-requisitos
 
@@ -91,6 +104,21 @@ Regras de autorizacao por papel (ownership, ADMIN, etc.) e o fluxo de servicos/c
 | `SERVER_PORT` | Porta exposta da API no host            | `8080`       |
 | `JWT_SECRET`  | Chave de assinatura dos tokens JWT (use um valor proprio e secreto fora do ambiente local) | placeholder de dev |
 | `JWT_EXPIRATION_MS` | Tempo de validade do token, em milissegundos | `3600000` (1h) |
+| `SPRING_PROFILES_ACTIVE` | Profile ativo do Spring. Defina como `dev` para habilitar o seed do usuario ADMIN de teste | vazio |
+| `ADMIN_EMAIL` | E-mail do usuario ADMIN de teste (so tem efeito com `SPRING_PROFILES_ACTIVE=dev`) | vazio |
+| `ADMIN_PASSWORD` | Senha do usuario ADMIN de teste (so tem efeito com `SPRING_PROFILES_ACTIVE=dev`) | vazio |
+
+## ADMIN para testes locais
+
+O cadastro publico (`POST /usuarios/cadastro`) sempre cria usuarios com papel `USER` — nao ha como o cliente se promover a `ADMIN` pela API. Para testes locais que exigem um usuario `ADMIN`, defina no seu `.env`:
+
+```
+SPRING_PROFILES_ACTIVE=dev
+ADMIN_EMAIL=admin@campusgigs.edu
+ADMIN_PASSWORD=uma-senha-somente-local
+```
+
+Com essas variaveis definidas, o `AdminSeeder` (componente restrito ao profile `dev`) cria o usuario ADMIN automaticamente na inicializacao, caso ele ainda nao exista. Sem `SPRING_PROFILES_ACTIVE=dev`, esse componente nunca e executado e nenhum usuario ADMIN e criado — comportamento padrao para producao. Nenhuma senha real e versionada: o valor fica apenas no `.env` local (fora do controle de versao).
 
 ## Estrutura do schema (V1)
 
@@ -139,3 +167,61 @@ Authorization: Bearer <token>
 ```
 
 Retorna `200` com os dados do usuario dono do token. Retorna `401` se o header `Authorization` estiver ausente, malformado, com token invalido ou expirado.
+
+### Publicar servico
+
+```
+POST /servicos
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "titulo": "Aula de Calculo",
+  "descricao": "Reforco de calculo 1",
+  "categoria": "Aulas",
+  "preco": 50.00
+}
+```
+
+Retorna `201`. O prestador e sempre o usuario autenticado.
+
+### Editar servico
+
+```
+PUT /servicos/{id}
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "titulo": "Aula de Calculo Avancada",
+  "descricao": "Reforco de calculo 1 e 2",
+  "categoria": "Aulas",
+  "preco": 60.00,
+  "situacao": "ATIVO"
+}
+```
+
+Retorna `200` se o usuario autenticado for o prestador do servico; `403` caso contrario. `situacao` aceita apenas `ATIVO` ou `PAUSADO` (para encerrar, use o endpoint dedicado abaixo).
+
+### Encerrar servico
+
+```
+POST /servicos/{id}/encerrar
+Authorization: Bearer <token>
+```
+
+Retorna `200` se o usuario autenticado for o prestador do servico **ou** tiver papel `ADMIN`; `403` caso contrario.
+
+### Contratar servico
+
+```
+POST /contratacoes
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "servicoId": 1
+}
+```
+
+Retorna `201`. Retorna `409` se o servico nao estiver `ATIVO` ou se o usuario autenticado for o proprio prestador do servico.
